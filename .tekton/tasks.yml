@@ -52,7 +52,11 @@ spec:
       script: |
         #!/bin/sh
         set -eu
-        npm ci
+        mkdir -p /tmp/counter-service
+        cp package.json package-lock.json .eslintrc.js /tmp/counter-service/
+        cp -R src tests /tmp/counter-service/
+        cd /tmp/counter-service
+        npm ci --no-audit --no-fund
         npm run lint -- $ESLINT_ARGS
 ---
 apiVersion: tekton.dev/v1beta1
@@ -79,5 +83,9 @@ spec:
       script: |
         #!/bin/sh
         set -eu
-        npm ci
+        mkdir -p /tmp/counter-service
+        cp package.json package-lock.json .eslintrc.js /tmp/counter-service/
+        cp -R src tests /tmp/counter-service/
+        cd /tmp/counter-service
+        npm ci --no-audit --no-fund
         npm test -- $JEST_ARGS
