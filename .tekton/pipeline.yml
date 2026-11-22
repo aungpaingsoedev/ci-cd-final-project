@@ -1,0 +1,76 @@
+apiVersion: tekton.dev/v1beta1
+kind: Pipeline
+metadata:
+  name: ci-cd-final-project
+spec:
+  params:
+    - name: repo-url
+      type: string
+      default: https://github.com/aungpaingsoedev/ci-cd-final-project.git
+    - name: branch
+      type: string
+      default: main
+    - name: app-name
+      type: string
+      default: counter-service
+    - name: build-image
+      type: string
+  workspaces:
+    - name: output
+  tasks:
+    - name: cleanup
+      taskRef:
+        name: cleanup
+      workspaces:
+        - name: source
+          workspace: output
+    - name: git-clone
+      runAfter: [cleanup]
+      taskRef:
+        kind: ClusterTask
+        name: git-clone
+      params:
+        - name: url
+          value: $(params.repo-url)
+        - name: revision
+          value: $(params.branch)
+        - name: deleteExisting
+          value: 'true'
+      workspaces:
+        - name: output
+          workspace: output
+    - name: eslint
+      runAfter: [git-clone]
+      taskRef:
+        name: eslint
+      workspaces:
+        - name: source
+          workspace: output
+    - name: jest-test
+      runAfter: [eslint]
+      taskRef:
+        name: jest-test
+      workspaces:
+        - name: source
+          workspace: output
+    - name: buildah
+      runAfter: [jest-test]
+      taskRef:
+        kind: ClusterTask
+        name: buildah
+      params:
+        - name: IMAGE
+          value: $(params.build-image)
+      workspaces:
+        - name: source
+          workspace: output
+    - name: deploy
+      runAfter: [buildah]
+      taskRef:
+        kind: ClusterTask
+        name: openshift-client
+      params:
+        - name: SCRIPT
+          value: |
+            oc create deployment $(params.app-name) --image=$(params.build-image) --dry-run=client -o yaml | oc apply -f -
+            oc rollout status deployment/$(params.app-name) --timeout=180s
